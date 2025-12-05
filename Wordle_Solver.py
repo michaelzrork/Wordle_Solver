@@ -9,16 +9,8 @@ words = []
 excluded_letters = set()
 included_letters = set()
 doubled_letters = set()
-first_letter = ''
-second_letter = ''
-third_letter = ''
-fourth_letter = ''
-fifth_letter = ''
-not_first_position = set()
-not_second_position = set()
-not_third_position = set()
-not_fourth_position = set()
-not_fifth_position = set()
+solved_positions = [''] * 5
+not_positions = [set() for _ in range(5)]
 
 # -------------------------------
 # Fetch words
@@ -28,16 +20,8 @@ def fetch_words():
     global excluded_letters
     global included_letters
     global doubled_letters
-    global first_letter
-    global second_letter
-    global third_letter
-    global fourth_letter
-    global fifth_letter
-    global not_first_position
-    global not_second_position
-    global not_third_position
-    global not_fourth_position
-    global not_fifth_position
+    global solved_positions
+    global not_positions
 
     matches = []
     for word in words:
@@ -67,24 +51,21 @@ def fetch_words():
         # -------------------------------  
         # Position N must equal letter X (Green letters)
         # -------------------------------
-   
-        correct_positions = [first_letter, second_letter, third_letter, fourth_letter, fifth_letter]
        
-        if any(correct_positions[i] != '' and word[i] != correct_positions[i] for i in range(5)):
+        if any(solved_positions[i] != '' and word[i] != solved_positions[i] for i in range(5)):
             continue
        
         # -------------------------------
         # Position N cannot equal letter X (Yellow letters)
         # -------------------------------
 
-        letter_exclusions = [not_first_position, not_second_position, not_third_position, not_fourth_position, not_fifth_position]
-
-        if any(word[i] in letter_exclusions[i] for i in range(5)):
+        if any(word[i] in not_positions[i] for i in range(5)):
             continue
        
         # -------------------------------
         # Handle double letter cases
         # -------------------------------
+       
         if any(word.count(letter) < 2 for letter in doubled_letters):
             continue
        
@@ -118,7 +99,7 @@ def print_list(round):
     # -------------------------------
     # If it is the 6th round and not solved, show message and reset
     # -------------------------------
-    elif round == 5 and any(letter == '' for letter in [first_letter, second_letter, third_letter, fourth_letter, fifth_letter]):
+    elif round == 5 and any(letter == '' for letter in solved_positions):
         print(f"\n{'='*50}")
         print("\nMaximum rounds reached. The possible words were:\n")
         for word in sorted(word_list):
@@ -129,7 +110,7 @@ def print_list(round):
     # -------------------------------
     # If it is the 6th round and solved, congratulate and reset
     # -------------------------------
-    elif round == 5 and all(letter != '' for letter in [first_letter, second_letter, third_letter, fourth_letter, fifth_letter]):
+    elif round == 5 and all(letter != '' for letter in solved_positions):
         print(f"\n{'='*50}")
         print(f"CONGRATULATIONS! You've solved today's Wordle!")
         print(f"The word is: {word_list[0].upper()}")
@@ -185,28 +166,14 @@ def reset_game_state():
     global reset_game
     global excluded_letters
     global included_letters
-    global first_letter
-    global second_letter
-    global third_letter
-    global fourth_letter
-    global fifth_letter
-    global not_first_position
-    global not_second_position
-    global not_third_position
-    global not_fourth_position
-    global not_fifth_position
+    global doubled_letters
+    global solved_positions
+    global not_positions
+    doubled_letters = set()
+    solved_positions = [''] * 5
+    not_positions = [set() for _ in range(5)]
     excluded_letters = set()
     included_letters = set()
-    first_letter = ''
-    second_letter = ''
-    third_letter = ''
-    fourth_letter = ''
-    fifth_letter = ''
-    not_first_position = set()
-    not_second_position = set()
-    not_third_position = set()
-    not_fourth_position = set()
-    not_fifth_position = set()
     reset_game = True
    
 # -------------------------------
@@ -217,16 +184,9 @@ def play_game():
     global reset_game
     global excluded_letters
     global included_letters
-    global first_letter
-    global second_letter
-    global third_letter
-    global fourth_letter
-    global fifth_letter
-    global not_first_position
-    global not_second_position
-    global not_third_position
-    global not_fourth_position
-    global not_fifth_position
+    global doubled_letters
+    global solved_positions
+    global not_positions
    
     # -------------------------------
     # Initialize/reset variables
@@ -291,13 +251,20 @@ def play_game():
                 valid_guess = True
        
         if guess != "":
+            # -------------------------------
+            # initialize guess state
+            # -------------------------------
+            guess_state = [('', '')] * 5
+            # -------------------------------
+            # prompt user for letter states
+            # -------------------------------
             print("\nEnter the state of each letter in your guess\n'g' for green, 'y' for yellow, 'b' for black/gray\n")
             for i in range(5):
                 # -------------------------------
                 # if letter already confirmed green, skip
                 # -------------------------------
-                correct_positions = [first_letter, second_letter, third_letter, fourth_letter, fifth_letter]
-                if correct_positions[i] != '' and guess[i] == correct_positions[i]:
+                if solved_positions[i] != '' and guess[i] == solved_positions[i]:
+                    guess_state[i] = (guess[i], 'g') # this is unnecessary but keeps structure consistent
                     print(f"Position {i+1} is '{guess[i].upper()}': CONFIRMED GREEN")
                     continue
                 valid_state = False
@@ -319,16 +286,7 @@ def play_game():
                         valid_state = True
                         # only add to excluded letters if not in included letters
                         if guess[i] in included_letters:
-                            if i == 0:
-                                not_first_position.add(guess[i])
-                            elif i == 1:
-                                not_second_position.add(guess[i])
-                            elif i == 2:
-                                not_third_position.add(guess[i])
-                            elif i == 3:
-                                not_fourth_position.add(guess[i])
-                            elif i == 4:
-                                not_fifth_position.add(guess[i])
+                            not_positions[i].add(guess[i])
                         else:
                             excluded_letters.add(guess[i])
 
@@ -337,58 +295,59 @@ def play_game():
                     # -------------------------------
                     elif state == 'g':
                         valid_state = True
-                        if i == 0:
-                            first_letter = guess[i]
-                            included_letters.add(guess[i])
-                        elif i == 1:
-                            second_letter = guess[i]
-                            included_letters.add(guess[i])
-                        elif i == 2:
-                            third_letter = guess[i]
-                            included_letters.add(guess[i])
-                        elif i == 3:
-                            fourth_letter = guess[i]
-                            included_letters.add(guess[i])
-                        elif i == 4:
-                            fifth_letter = guess[i]
-                            included_letters.add(guess[i])
+                        solved_positions[i] = guess[i]
+                        # -------------------------------
+                        # Add to included letters
+                        # -------------------------------
+                        included_letters.add(guess[i])
                     # -------------------------------
                     # if yellow, add to not position and included letters
                     # -------------------------------
                     elif state == 'y':
                         valid_state = True
                         # -------------------------------
-                        # Check for doubled letters
+                        # Check for doubled letters from previous guesses
                         # -------------------------------
-                        if any(letter == guess[i] for letter in [first_letter, second_letter, third_letter, fourth_letter, fifth_letter]):
+                        if guess[i] in solved_positions:
                             doubled_letters.add(guess[i])
                         # -------------------------------
-                        # Add to not position and included letters
+                        # Add to not position
                         # -------------------------------
-                        if i == 0:
-                            not_first_position.add(guess[i])
-                            included_letters.add(guess[i])
-                        elif i == 1:
-                            not_second_position.add(guess[i])
-                            included_letters.add(guess[i])
-                        elif i == 2:
-                            not_third_position.add(guess[i])
-                            included_letters.add(guess[i])
-                        elif i == 3:
-                            not_fourth_position.add(guess[i])
-                            included_letters.add(guess[i])
-                        elif i == 4:
-                            not_fifth_position.add(guess[i])
-                            included_letters.add(guess[i])
+                        not_positions[i].add(guess[i])
+                        # -------------------------------
+                        # Add to included letters
+                        # -------------------------------
+                        included_letters.add(guess[i])
                     # -------------------------------
                     # invalid state entered
                     # -------------------------------
                     else:
                         print("Invalid state entered. Please enter 'g', 'y', or 'b'.")
+                # -------------------------------
+                # Update guess state
+                # -------------------------------
+                guess_state[i] = (guess[i], state)
+           
+            # -------------------------------
+            # Check for doubled letters in current guess
+            # -------------------------------
+            for letter, state in guess_state:
+                if state == 'y' and guess.count(letter) > 1:
+                    if letter in solved_positions:
+                        doubled_letters.add(letter)
+        # -------------------------------
+        # If guess is empty (reset), break to outer loop
+        # -------------------------------            
         else:
             break
-               
+       
+        # -------------------------------
+        # Print possible words
+        # -------------------------------        
         print_list(round)
+        # -------------------------------
+        # If game reset, break to outer loop
+        # -------------------------------
         if reset_game == True:
             break
 
@@ -462,4 +421,3 @@ while reset_game == True:
         exit()
     else:
         print("Invalid choice. Continuing with current word list.")
-
