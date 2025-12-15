@@ -1,114 +1,53 @@
-import urllib.request
+from src.utils import pause_prompt 
+from src.game_utils import quit_game
+from src import answer_lists
+from src.solver import fetch_words
 
 # -------------------------------
 # Variables
 # -------------------------------
 
-num_rounds = 6 # default number of rounds
-num_letters = 5 # default number of letters
-url = ''
-words = []
-answer_list = "cfreshman Wordle Answers List"
+num_rounds = 0
+num_letters = 0
 excluded_letters = set()
 included_letters = set()
 doubled_letters = set()
-solved_positions = [''] * num_letters
-not_positions = [set() for _ in range(num_letters)]
+solved_positions = ['']
+not_positions = []
 
 # -------------------------------
-# Answer Lists
+# Set Defaults
 # -------------------------------
-
-# Scrabble allowed words list
-link1 = 'https://raw.githubusercontent.com/redbo/scrabble/master/dictionary.txt'
-# Stanford Wordle list
-link2 = 'https://www-cs-faculty.stanford.edu/~knuth/sgb-words.txt'
-# cfreshman Wordle answers list
-link3 = 'https://gist.githubusercontent.com/cfreshman/a03ef2cba789d8cf00c08f767e0fad7b/raw/c46f451920d5cf6326d550fb2d6abb1642717852/wordle-answers-alphabetical.txt' 
-
-# -------------------------------
-# Initialize with default answer list
-# -------------------------------
-
-try:
-    response = urllib.request.urlopen(link3)
-    words = response.read().decode('utf-8').splitlines()
-except:
-    answer_list = "No answer list loaded"
-    words = []
-
-# -------------------------------
-# Helpers
-# -------------------------------
-
-def pause_prompt():
-    pause_input = input(f"\nPress any key to continue...")
-    if pause_input == '' or pause_input != '':
-        return
-    
+   
 def set_defaults():
-    global num_rounds
-    global num_letters
-    global answer_list
-    global words
-    global link3
+    global num_rounds, num_letters
     num_rounds = 6
     num_letters = 5
-    answer_list = "cfreshman Wordle Answers List"
-    try:
-        response = urllib.request.urlopen(link3)
-        words = response.read().decode('utf-8').splitlines()
-        print(f"\nGame settings have been reset to defaults.")
-    except:
-        answer_list = "No answer list loaded"
-        words = []
-        print(f"\nGame settings have been reset to defaults, but failed to load the default answer list.")
+    returned = answer_lists.get_words_from_url(answer_lists.answer_lists[2])  # Default to cfreshman Wordle Solutions list
+    if returned:
+        reset_game_state()
+        print(f"\nDefault settings applied:\n- Number of Rounds: {num_rounds}\n- Number of Letters: {num_letters}\n- Selected Answers: {answer_lists.selected_answer_list[1]}")
+    else:
+        print(f"\nFailed to load the {answer_lists.answer_lists[2][1]} list.")
+        pause_prompt()
 
+        
 # --------------------------------
-# Game Menu
+# Reset game state
 # --------------------------------
 
-def game_menu():
-    global num_rounds
+def reset_game_state():
+    global excluded_letters
+    global included_letters
+    global doubled_letters
+    global solved_positions
+    global not_positions
     global num_letters
-    global answer_list
-    global link3
-    global words
-    
-    while True:
-        print(f"\n{'='*50}")
-        print(f"WORDLE SOLVER - GAME MENU")
-        print(f"{'='*50}")
-        print(f"\nSelect One:")
-        print(f"1. Start Game")
-        print(f"2. Set number of letters (current: {num_letters})")
-        print(f"3. Set number of rounds (current: {num_rounds})")
-        print(f"4. Select answer list (curerent: {answer_list})")
-        print(f"5. Reset to defaults.")
-        print(f"6. Exit")
-
-        choice = input(f"\nEnter choice: ").strip()
-        if choice == '3':
-            set_num_rounds(num_rounds)
-        elif choice == '2':
-            set_num_letters(num_letters)
-        elif choice == '4':
-            if num_letters != 5:
-                print(f"\nAnswer list selection is disabled.\nSet the number of letters back to 5 to select a different answer list.")
-                pause_prompt()
-            else:
-                pick_answer_list()    
-        elif choice == '1':
-            print(f"\nStarting the game with {num_rounds} rounds and {num_letters} letters using the {answer_list}...\n")
-            play_game()
-        elif choice == '5':
-            set_defaults()
-            pause_prompt()
-        elif choice == '6' or choice == 'exit' or choice == 'quit':
-            print(f"Exiting the program. Goodbye!")
-            exit()
-        else:
-            print(f"Invalid choice. Please select a number 1-5.")
+    doubled_letters = set()
+    solved_positions = [''] * num_letters
+    not_positions = [set() for _ in range(num_letters)]
+    excluded_letters = set()
+    included_letters = set()
 
 # -------------------------------
 # Number of Rounds
@@ -132,108 +71,74 @@ def set_num_rounds(n):
 
 def set_num_letters(n):
     global num_letters
-    global words
-    global answer_list
-    global link1
     num_letters = input(f"\nEnter the number of letters in the word (default is 5): ").strip()
             
     if num_letters.isdigit() and int(num_letters) >= 1:
         num_letters = int(num_letters)
-        print(f"You have selected to play with {num_letters} letters.")
+        print(f"\nGame set to use {num_letters} letters.")
         if num_letters != 5:
-            try:
-                response = urllib.request.urlopen(link1)
-                words = response.read().decode('utf-8').splitlines()
-                answer_list = "Scrabble Allowed Words"
-                print(f"\nAnswer list updated to Scrabble Allowed Words to accommodate different word lengths.") 
-                pause_prompt()
-            except:
-                answer_list = "Unable to load answer list."
-                pause_prompt()
-                words = []
-        else:
-            pause_prompt()
+            print(f"\nLoading {answer_lists.answer_lists[0][1]} to accommodate different word lengths.") 
+            if answer_lists.get_words_from_url(answer_lists.answer_lists[0]):  # Load Scrabble list for different lengths          
+                answer_lists.selected_answer_list = answer_lists.answer_lists[0]
+                print(f"{answer_lists.selected_answer_list[1]} loaded successfully.")
+            else:
+                print(f"Failed to load {answer_lists.answer_lists[0][1]}. Reverting to 5 letters and default list.")
+                num_letters = 5
+                answer_lists.get_words_from_url(answer_lists.answer_lists[2])  # Revert to default cfreshman list
+                answer_lists.selected_answer_list = answer_lists.answer_lists[2]
+        
+        pause_prompt()
     else:
         num_letters = 5
         print(f"Invalid input. Defaulting to 5 letters.")  
         pause_prompt()
         
-            
-# -------------------------------
-# Answer List Selection
-# -------------------------------
+# --------------------------------
+# Game Menu
+# --------------------------------
 
-def pick_answer_list():
-    global words
-    global answer_list
-    global link1
-    global link2
-    global link3
-    print(f"\nPlease select the answer list you would like to use:\n")
-    print(f"1. Scrabble Allowed Words List - Full Scrabble dictionary (any length word, least restrictive)")
-    print(f"2. Stanford Wordle List - Official Wordle Answers (5 word length only, moderately restrictive)")
-    print(f"3. cfreshman Wordle Answers List - Official Wordle Solutions (most restrictive)")
-    print(f"4. Back to Game Menu")
-    print(f"5. Exit")
-
+def game_menu():
+    global num_rounds, num_letters
     while True:
+        reset_game_state()
+        print(f"\n{'='*50}")
+        print(f"WORDLE SOLVER - GAME MENU")
+        print(f"{'='*50}")
+        print(f"\nSelect One:")
+        print(f"1. Start Game")
+        print(f"2. Set number of letters (current: {num_letters})")
+        print(f"3. Set number of rounds (current: {num_rounds})")
+        print(f"4. Select answer list (curerent: {answer_lists.selected_answer_list[1]})")
+        print(f"5. Reset to defaults.")
+        print(f"6. Exit")
+
         choice = input(f"\nEnter choice: ").strip()
-        if choice == '':
-            print(f"\nPlease make a seclection and try again.")
-            continue
-        elif choice == '1':
-            url = link1
-            answer_list = "Scrabble Allowed Words"
-            print(f"\nYou have selected the {answer_list}\n")
-            pause_prompt()  
-            break
+        if choice == '1':
+            print(f"\nStarting the game with {num_rounds} rounds and {num_letters} letters using the {answer_lists.selected_answer_list[1]}...\n")
+            play_game()
         elif choice == '2':
-            url = link2
-            answer_list = "Stanford Wordle List"
-            print(f"\nYou have selected the {answer_list}\n")
-            pause_prompt()
-            break
+            set_num_letters(num_letters)
         elif choice == '3':
-            url = link3
-            answer_list = "cfreshman Wordle Answers List"
-            print(f"\nYou have selected the {answer_list}\n")
-            pause_prompt()
-            break
+            set_num_rounds(num_rounds)
         elif choice == '4':
-            print(f"\nAnswer list unchanged. Returning to Game Menu...\n")
-            pause_prompt()
-            return
+            if num_letters != 5:
+                print(f"\nAnswer list selection is disabled.\nSet the number of letters back to 5 to select a different answer list.")
+                pause_prompt()
+            else:
+                answer_lists.pick_answer_list()
         elif choice == '5':
-            quit_choice = input(f"Are you sure you want to exit the program? (y/n): ").strip().lower()
-            print(f"Exiting the program. Goodbye!")
-            exit()
+            set_defaults()
+            pause_prompt()
+        elif choice == '6' or choice == 'exit' or choice == 'quit' or choice == '':
+            quit_game()
+        elif choice == '7':
+            print(f"\nCurrent word list ({len(answer_lists.words)} words):\n")
+            print_list(0)
+            pause_prompt()
         else:
-            print(f"Invalid selection. Please try again.")
-            continue
+            print(f"Invalid choice. Please select a number 1-6.")
+            pause_prompt()
 
-    try:
-        response = urllib.request.urlopen(url)
-        words = response.read().decode('utf-8').splitlines()
-    except:
-        words = []
-
-# --------------------------------
-# Reset game state
-# --------------------------------
-
-def reset_game_state():
-    global excluded_letters
-    global included_letters
-    global doubled_letters
-    global solved_positions
-    global not_positions
-    global num_letters
-    doubled_letters = set()
-    solved_positions = [''] * num_letters
-    not_positions = [set() for _ in range(num_letters)]
-    excluded_letters = set()
-    included_letters = set()
-    
 # -------------------------------
 # Play Game
 # -------------------------------
@@ -246,11 +151,7 @@ def play_game():
     global not_positions
     global num_letters
     global num_rounds
-   
-    # -------------------------------
-    # Initialize/reset variables
-    # -------------------------------
-    reset_game_state()
+    guess_history = []
    
     # -------------------------------
     # Game loop - up to n rounds
@@ -274,6 +175,21 @@ def play_game():
                     return
                 else:
                     continue
+            
+            # -------------------------------
+            # Debugging print
+            # -------------------------------
+            
+            if guess == 'd':
+                print(f"DEBUG: Excluded Letters: {excluded_letters}")
+                print(f"DEBUG: Included Letters: {included_letters}")
+                print(f"DEBUG: Doubled Letters: {doubled_letters}")
+                print(f"DEBUG: Solved Positions: {solved_positions}")
+                print(f"DEBUG: Not Positions: {not_positions}")
+                print(f"DEBUG: Guess History: {guess_history}")
+                pause_prompt()
+                continue
+            
             # -------------------------------
             # if not word length, show error and re-prompt
             # -------------------------------
@@ -290,6 +206,7 @@ def play_game():
             # valid guess  
             # -------------------------------
             else:
+                guess_history.append(guess)
                 break
         
         # -------------------------------
@@ -328,6 +245,21 @@ def play_game():
                         return
                     else:
                         continue
+                
+                # -------------------------------
+                # Debugging print
+                # -------------------------------
+                
+                if state == 'd':
+                    print(f"DEBUG: Excluded Letters: {excluded_letters}")
+                    print(f"DEBUG: Included Letters: {included_letters}")
+                    print(f"DEBUG: Doubled Letters: {doubled_letters}")
+                    print(f"DEBUG: Solved Positions: {solved_positions}")
+                    print(f"DEBUG: Not Positions: {not_positions}")
+                    print(f"DEBUG: Guess History: {guess_history}")
+                    print(f"DEBUG: Current Guess State: {guess_state}")
+                    pause_prompt()
+                    continue
                 
                 # -------------------------------
                 # if black/gray, add to excluded letters
@@ -395,7 +327,6 @@ def play_game():
         # -------------------------------        
         print_list(round)
         
-
 # -------------------------------
 # Print list
 # -------------------------------
@@ -403,9 +334,17 @@ def play_game():
 def print_list(round):  
     global num_rounds
     global solved_positions
-    global words
     global excluded_letters
-    word_list = fetch_words()
+    global included_letters
+    global doubled_letters
+    global not_positions
+    global num_letters
+    
+    # -------------------------------
+    # Fetch possible words  
+    # -------------------------------
+    
+    word_list = fetch_words(excluded_letters, included_letters, doubled_letters, solved_positions, not_positions, answer_lists.words, num_letters)
    
     # -------------------------------
     # If word list is empty, show message and reset
@@ -463,85 +402,3 @@ def print_list(round):
         print(f"TOTAL: {len(word_list)} possible matches")
         print(f"{'='*50}")
         return
-        
-# -------------------------------
-# Fetch words
-# -------------------------------
-
-def fetch_words():
-    global excluded_letters
-    global included_letters
-    global doubled_letters
-    global solved_positions
-    global not_positions
-    global words
-    global num_letters
-
-    matches = []
-    for word in words:
-        word = word.lower().strip()
-   
-        # -------------------------------
-        # Word must be 5 letters long
-        # -------------------------------
-   
-        if len(word) != num_letters:
-            continue
-   
-        # -------------------------------
-        # Can't contain excluded letters (Black/Gray)
-        # -------------------------------
-   
-        if any(letter in excluded_letters for letter in word):
-            continue
-       
-        # -------------------------------
-        # Must contain included letters (Yellow or Green)
-        # -------------------------------
-       
-        if any(letter not in word for letter in included_letters):
-            continue
-   
-        # -------------------------------  
-        # Position N must equal letter X (Green letters)
-        # -------------------------------
-       
-        if any(solved_positions[i] != '' and word[i] != solved_positions[i] for i in range(num_letters)):
-            continue
-       
-        # -------------------------------
-        # Position N cannot equal letter X (Yellow letters)
-        # -------------------------------
-
-        if any(word[i] in not_positions[i] for i in range(num_letters)):
-            continue
-       
-        # -------------------------------
-        # Handle double letter cases
-        # -------------------------------
-       
-        if any(word.count(letter) < 2 for letter in doubled_letters):
-            continue
-       
-        # -------------------------------
-        # If all conditions met, add to matches
-        # -------------------------------
-       
-        matches.append(word)
-       
-    # -------------------------------
-    # Return matches
-    # -------------------------------
-   
-    return matches
-
-# -------------------------------
-# Start game loop
-# -------------------------------
-
-print(f"\n")
-print(f"{'*'*50}")
-print(f"Welcome to the Wordle Solver!")
-print(f"{'*'*50}")
-
-game_menu() 
