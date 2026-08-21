@@ -344,9 +344,14 @@ export default function Home() {
           Guesses are matched by replaying them against every word in the list, so repeated
           letters resolve exactly the way the game scores them. Suggestions rank by how few
           candidates each guess would leave behind. Words from{" "}
-          <a className="underline hover:text-ink" href={list.source} rel="noreferrer" target="_blank">
-            {list.name}
-          </a>
+          {list.sources.map((source, index) => (
+            <span key={source.url}>
+              {index > 0 && " and "}
+              <a className="underline hover:text-ink" href={source.url} rel="noreferrer" target="_blank">
+                {source.name}
+              </a>
+            </span>
+          ))}
           .{" "}
           <a
             className="underline hover:text-ink"

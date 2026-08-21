@@ -24,8 +24,8 @@ drops the last guess, **Reset** clears the board.
 - **Letters per word** — 2 to 12. Anything other than five switches to the Scrabble
   dictionary, the only list that carries other lengths.
 - **Rounds** — 1 to 10.
-- **Answer list** — the official Wordle solutions (default, tightest), Knuth's Stanford
-  five-letter list, or the full Scrabble dictionary.
+- **Answer list** — common five-letter words (default), the original Wordle answers, or
+  the full Scrabble dictionary.
 
 ## How the solving works
 
@@ -99,9 +99,15 @@ cli/                 The original Python command-line solver
 
 | List | Words | Source |
 | --- | --- | --- |
-| Wordle answers | 2,315 | [cfreshman gist](https://gist.github.com/cfreshman/a03ef2cba789d8cf00c08f767e0fad7b) |
+| Common five-letter words (default) | 5,790 | the two below, merged |
+| Original Wordle answers | 2,315 | [cfreshman gist](https://gist.github.com/cfreshman/a03ef2cba789d8cf00c08f767e0fad7b) |
 | Stanford five-letter words | 5,757 | [Knuth's SGB word list](https://www-cs-faculty.stanford.edu/~knuth/sgb-words.txt) |
 | Scrabble dictionary | 178,691 | [redbo/scrabble](https://github.com/redbo/scrabble) |
+
+The default merges Knuth's list with the original answers because neither covers the
+game on its own: Wordle has used solutions the shipped answer list never held (ASPIC),
+and Knuth's list is missing 33 words that have been answers (ADMIN, LATTE, ANIME). The
+union is the only set that carries both.
 
 They are vendored rather than fetched at runtime, so the app has no external dependency
 at request time and works offline once loaded.
