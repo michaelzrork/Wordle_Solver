@@ -11,8 +11,7 @@ export interface WordListInfo {
   description: string;
   /** Word lengths this list can serve, or "any" for a full dictionary. */
   lengths: number[] | "any";
-  /** One or more files, merged into a single list of unique words. */
-  files: string[];
+  file: string;
   sources: WordListSource[];
 }
 
@@ -34,11 +33,11 @@ const SCRABBLE: WordListSource = {
 export const WORD_LISTS: WordListInfo[] = [
   {
     id: "common",
-    name: "Common five-letter words",
+    name: "Likely answers",
     description:
-      "Knuth's Stanford list plus every word the official answer list holds. The default — the answer list alone has been outgrown by the game.",
+      "Every official answer plus Knuth's Stanford words, minus the plurals Wordle never uses. The default — the answer list alone has been outgrown by the game.",
     lengths: [5],
-    files: ["/wordlists/stanford.txt", "/wordlists/wordle-answers.txt"],
+    file: "/wordlists/common.txt",
     sources: [STANFORD, CFRESHMAN],
   },
   {
@@ -47,7 +46,7 @@ export const WORD_LISTS: WordListInfo[] = [
     description:
       "The 2,315 solutions Wordle shipped with. The tightest set, but the puzzle has since used words outside it.",
     lengths: [5],
-    files: ["/wordlists/wordle-answers.txt"],
+    file: "/wordlists/wordle-answers.txt",
     sources: [CFRESHMAN],
   },
   {
@@ -55,7 +54,7 @@ export const WORD_LISTS: WordListInfo[] = [
     name: "Scrabble dictionary",
     description: "Every playable Scrabble word, 2 to 15 letters. Needed for word lengths other than five.",
     lengths: "any",
-    files: ["/wordlists/scrabble.txt"],
+    file: "/wordlists/scrabble.txt",
     sources: [SCRABBLE],
   },
 ];
@@ -77,27 +76,27 @@ export function listsForLength(length: number): WordListInfo[] {
 
 const cache = new Map<string, Promise<string[]>>();
 
-async function fetchWords(file: string): Promise<string[]> {
-  const response = await fetch(file);
-  if (!response.ok) throw new Error(`Could not load ${file} (${response.status})`);
-
-  return response
-    .text()
-    .then((text) => text.split("\n").map((word) => word.trim().toLowerCase()).filter(Boolean));
-}
-
 /** Fetch a list once and keep it around for the rest of the session. */
 export function loadWordList(id: string): Promise<string[]> {
   const list = getWordList(id);
   const cached = cache.get(list.id);
   if (cached) return cached;
 
-  const pending = Promise.all(list.files.map(fetchWords))
-    .then((files) => [...new Set(files.flat())].sort())
+  const pending = fetch(list.file)
+    .then((response) => {
+      if (!response.ok) throw new Error(`Could not load ${list.name} (${response.status})`);
+      return response.text();
+    })
+    .then((text) =>
+      text
+        .split("\n")
+        .map((word) => word.trim().toLowerCase())
+        .filter(Boolean),
+    )
     .catch((cause: Error) => {
       // Don't cache a failure — a retry should be able to succeed.
       cache.delete(list.id);
-      throw new Error(`Could not load ${list.name}. ${cause.message}`);
+      throw cause;
     });
 
   cache.set(list.id, pending);

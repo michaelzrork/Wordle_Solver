@@ -201,35 +201,49 @@ function frequencyScore(candidates: string[], length: number): (word: string) =>
 }
 
 /**
- * Exact ranking, written flat because it runs on the main thread.
+ * Rank `guesses` by how many of `answers` would survive each one.
  *
- * Scoring every candidate against every other is quadratic, so the words are
- * packed into one byte array up front and each pattern is folded into a base-3
- * integer — no per-pair allocation, no strings.
+ * Written flat because it is quadratic: the words are packed into byte arrays
+ * up front and each pattern is folded into a base-3 integer, so the inner loop
+ * allocates nothing. `scale` corrects the result when `answers` is a sample of
+ * a larger candidate set — bucket sizes grow with the set, so the average
+ * grows with it too.
  */
-function rankExact(candidates: string[], length: number, limit: number): Suggestion[] {
-  const count = candidates.length;
-  const codes = new Uint8Array(count * length);
-  for (let i = 0; i < count; i++) {
-    const word = candidates[i];
-    for (let k = 0; k < length; k++) {
-      codes[i * length + k] = (word.charCodeAt(k) - 97) & 31;
+function rankByExpectation(
+  guesses: string[],
+  answers: string[],
+  length: number,
+  limit: number,
+  scale: number,
+): Suggestion[] {
+  const encode = (words: string[]) => {
+    const codes = new Uint8Array(words.length * length);
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      for (let k = 0; k < length; k++) {
+        codes[i * length + k] = (word.charCodeAt(k) - 97) & 31;
+      }
     }
-  }
+    return codes;
+  };
+
+  const guessCodes = encode(guesses);
+  const answerCodes = encode(answers);
+  const answerCount = answers.length;
 
   const buckets = new Int32Array(3 ** length);
-  const touchedKeys = new Int32Array(count);
+  const touchedKeys = new Int32Array(answerCount);
   const letterCounts = new Int32Array(32);
   const touchedLetters = new Int32Array(length);
   const isGreen = new Uint8Array(length);
   const scored: Suggestion[] = [];
 
-  for (let g = 0; g < count; g++) {
+  for (let g = 0; g < guesses.length; g++) {
     const guessAt = g * length;
     let touched = 0;
     let total = 0;
 
-    for (let a = 0; a < count; a++) {
+    for (let a = 0; a < answerCount; a++) {
       const answerAt = a * length;
       let letters = 0;
       let key = 0;
@@ -237,8 +251,8 @@ function rankExact(candidates: string[], length: number, limit: number): Suggest
       // Greens first; every other answer letter goes into the pool that
       // yellows draw from.
       for (let k = 0; k < length; k++) {
-        const answerLetter = codes[answerAt + k];
-        if (codes[guessAt + k] === answerLetter) {
+        const answerLetter = answerCodes[answerAt + k];
+        if (guessCodes[guessAt + k] === answerLetter) {
           isGreen[k] = 1;
         } else {
           isGreen[k] = 0;
@@ -253,7 +267,7 @@ function rankExact(candidates: string[], length: number, limit: number): Suggest
         if (isGreen[k] === 1) {
           mark = 2;
         } else {
-          const guessLetter = codes[guessAt + k];
+          const guessLetter = guessCodes[guessAt + k];
           if (letterCounts[guessLetter] > 0) {
             mark = 1;
             letterCounts[guessLetter]--;
@@ -275,12 +289,23 @@ function rankExact(candidates: string[], length: number, limit: number): Suggest
       buckets[touchedKeys[i]] = 0;
     }
 
-    scored.push({ word: candidates[g], expected: total / count });
+    scored.push({ word: guesses[g], expected: (total / answerCount) * scale });
   }
 
   return scored
     .sort((a, b) => a.expected - b.expected || a.word.localeCompare(b.word))
     .slice(0, limit);
+}
+
+/** Take at most `max` words, spread evenly across the list. */
+function sample(words: string[], max: number): string[] {
+  if (words.length <= max) return words;
+
+  const taken: string[] = [];
+  for (let i = 0; i < max; i++) {
+    taken.push(words[Math.floor((i * words.length) / max)]);
+  }
+  return taken;
 }
 
 /** Guesses worth playing next, best first. */
@@ -290,9 +315,8 @@ export function rankGuesses(candidates: string[], length: number, limit = 5): Su
     return candidates.slice(0, limit).map((word) => ({ word, expected: 1 }));
   }
 
-  // The exact calculation is quadratic, so fall back to a letter-frequency
-  // heuristic while the candidate list is still enormous.
-  if (candidates.length > EXACT_RANKING_LIMIT || length > MAX_EXACT_LENGTH) {
+  // Above this word length the base-3 pattern table gets impractically large.
+  if (length > MAX_EXACT_LENGTH) {
     const score = frequencyScore(candidates, length);
     return candidates
       .map((word) => ({ word, score: score(word) }))
@@ -301,11 +325,29 @@ export function rankGuesses(candidates: string[], length: number, limit = 5): Su
       .map(({ word }) => ({ word, expected: Number.NaN }));
   }
 
-  return rankExact(candidates, length, limit);
+  if (candidates.length <= EXACT_RANKING_LIMIT) {
+    return rankByExpectation(candidates, candidates, length, limit, 1);
+  }
+
+  // Past that the full calculation is too slow even in a worker, so each guess
+  // is measured against an evenly spread sample of the candidates. The ranking
+  // holds up; only the last digit of the estimate moves.
+  const answers = sample(candidates, ANSWER_SAMPLE);
+  return rankByExpectation(
+    sample(candidates, GUESS_SAMPLE),
+    answers,
+    length,
+    limit,
+    candidates.length / answers.length,
+  );
 }
 
-/** Above this many candidates, exact ranking is too slow to run inline. */
-export const EXACT_RANKING_LIMIT = 3000;
+/** Below this many candidates, every guess is measured against every answer. */
+export const EXACT_RANKING_LIMIT = 1500;
+
+/** Answers to sample past that, and guesses to consider. */
+const ANSWER_SAMPLE = 1500;
+const GUESS_SAMPLE = 12000;
 
 /** Above this word length the base-3 pattern table gets impractically large. */
 const MAX_EXACT_LENGTH = 10;

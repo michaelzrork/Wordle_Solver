@@ -24,8 +24,8 @@ drops the last guess, **Reset** clears the board.
 - **Letters per word** — 2 to 12. Anything other than five switches to the Scrabble
   dictionary, the only list that carries other lengths.
 - **Rounds** — 1 to 10.
-- **Answer list** — common five-letter words (default), the original Wordle answers, or
-  the full Scrabble dictionary.
+- **Answer list** — likely answers (default), the original Wordle answers, or the full
+  Scrabble dictionary.
 
 ## How the solving works
 
@@ -53,8 +53,12 @@ sifting after playing it. Lower is better, and the top five are shown.
 
 That calculation is quadratic, so it runs in a Web Worker (`lib/rank.worker.ts`) with an
 allocation-free inner loop: words packed into one byte array, patterns folded into base-3
-integers. Roughly 5 million pairs a second, and the board never stalls. Above 3,000
-candidates it falls back to positional letter frequency instead.
+integers. Around 10 million pairs a second, and the board never stalls.
+
+Past 1,500 candidates even that is too slow, so each guess is measured against an evenly
+spread sample of 1,500 candidates and the result scaled back up. On the full default list
+that returns the same top guess as the exact calculation (RAISE), with the estimate
+within 2% of the true value, in a twentieth of the time.
 
 ## Running locally
 
@@ -91,7 +95,8 @@ components/          Board, Keyboard, Results, Settings
 lib/solver.ts        Scoring, filtering, ranking (no UI, fully tested)
 lib/rank.worker.ts   Ranking off the main thread
 lib/wordlists.ts     List metadata and loading
-public/wordlists/    The three word lists
+public/wordlists/    The word lists, including the generated default
+scripts/             Word list generation
 cli/                 The original Python command-line solver
 ```
 
@@ -99,15 +104,26 @@ cli/                 The original Python command-line solver
 
 | List | Words | Source |
 | --- | --- | --- |
-| Common five-letter words (default) | 5,790 | the two below, merged |
+| Likely answers (default) | 4,133 | built from the two below |
 | Original Wordle answers | 2,315 | [cfreshman gist](https://gist.github.com/cfreshman/a03ef2cba789d8cf00c08f767e0fad7b) |
 | Stanford five-letter words | 5,757 | [Knuth's SGB word list](https://www-cs-faculty.stanford.edu/~knuth/sgb-words.txt) |
 | Scrabble dictionary | 178,691 | [redbo/scrabble](https://github.com/redbo/scrabble) |
 
-The default merges Knuth's list with the original answers because neither covers the
-game on its own: Wordle has used solutions the shipped answer list never held (ASPIC),
-and Knuth's list is missing 33 words that have been answers (ADMIN, LATTE, ANIME). The
-union is the only set that carries both.
+Neither source is an answer list on its own. Wordle has used solutions the shipped list
+never held (ASPIC), Knuth's list is missing 33 words that have been answers (ADMIN,
+LATTE, ANIME), and Knuth's is a *word* list — it carries ~1,600 plural and third-person
+-S forms, which a Wordle answer is never allowed to be.
+
+So the default is generated: every official answer, plus the Stanford words that are not
+plural forms. Official answers are never filtered — they are known-good, and a few
+("brass", "amiss") would trip the heuristic. Regenerate with:
+
+```bash
+npm run build:wordlist
+```
+
+`scripts/build-common-list.mjs` holds the rule, and the test suite re-runs it and
+compares against the committed file, so the two cannot drift.
 
 They are vendored rather than fetched at runtime, so the app has no external dependency
 at request time and works offline once loaded.

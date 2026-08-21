@@ -11,9 +11,9 @@ describe("word list metadata", () => {
     expect(listsForLength(5).map((list) => list.id)).toEqual(["common", "wordle", "scrabble"]);
   });
 
-  it("defaults to a list that covers more than the original answers", () => {
+  it("defaults to the list built for answering, not the shipped one", () => {
     expect(getWordList(DEFAULT_LIST_ID).id).toBe("common");
-    expect(getWordList("common").files.length).toBeGreaterThan(1);
+    expect(getWordList("common").sources.length).toBe(2);
   });
 
   it("offers only the full dictionary for other lengths", () => {
@@ -23,9 +23,8 @@ describe("word list metadata", () => {
 });
 
 describe("shipped word lists", () => {
-  const read = (list: (typeof WORD_LISTS)[number]) => [
-    ...new Set(list.files.flatMap((file) => readFileSync(`public${file}`, "utf8").split("\n").filter(Boolean))),
-  ];
+  const read = (list: (typeof WORD_LISTS)[number]) =>
+    readFileSync(`public${list.file}`, "utf8").split("\n").filter(Boolean);
 
   it.each(WORD_LISTS)("$name is lowercase a-z, one word per line", (list) => {
     const words = read(list);
@@ -49,5 +48,13 @@ describe("shipped word lists", () => {
     expect(original).not.toContain("aspic");
     // ...and it keeps every original answer, which Stanford alone does not.
     expect(original.every((word) => common.includes(word))).toBe(true);
+  });
+
+  it("the default list is free of plurals, unlike the raw Stanford list", () => {
+    const common = read(getWordList("common"));
+    const plurals = common.filter((word) => word.endsWith("s") && !word.endsWith("ss"));
+    // A handful of genuine singulars survive (atlas, bogus, corps); the ~1,600
+    // plural forms Stanford carries do not.
+    expect(plurals.length).toBeLessThan(120);
   });
 });

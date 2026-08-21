@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "build:wordlist": "node scripts/build-common-list.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
