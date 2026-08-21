@@ -20,6 +20,7 @@ const MARK_CYCLE: Mark[] = ["gray", "yellow", "green"];
 
 const DEFAULT_SETTINGS: GameSettings = {
   listId: DEFAULT_LIST_ID,
+  preferredListId: DEFAULT_LIST_ID,
   length: 5,
   rounds: 6,
 };
@@ -80,12 +81,21 @@ export default function Home() {
   const error = ready ? loaded.error : null;
   const loading = !ready;
 
-  // Settings changes invalidate the board, so they reset it as they apply.
-  const applySettings = useCallback((next: GameSettings) => {
-    setSettings(next);
-    setGuesses([]);
-    setDraft(emptyDraft(next.length));
-  }, []);
+  // Only a new word length invalidates what is on the board; a different list
+  // or round count leaves the guesses standing.
+  const applySettings = useCallback(
+    (next: GameSettings) => {
+      setSettings(next);
+
+      if (next.length !== settings.length) {
+        setGuesses([]);
+        setDraft(emptyDraft(next.length));
+      } else {
+        setGuesses((current) => current.slice(0, next.rounds));
+      }
+    },
+    [settings.length],
+  );
 
   const candidates = useMemo(() => filterWords(words, guesses), [words, guesses]);
   const constraints = useMemo(
