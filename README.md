@@ -1,51 +1,107 @@
 # Wordle Solver
 
-A Python command-line tool that identifies possible Wordle solutions based on game feedback.
+A web app that narrows down the possible Wordle answers from the feedback the game
+gives you. Type a guess, color the tiles the way Wordle colored them, and every word
+that can still be the answer appears — along with the guess that would cut the list
+down fastest.
 
-## Description
+Started life as a Python command-line tool (still in [`cli/`](cli/)); this repo now
+also holds a TypeScript port with a Wordle-style front end, deployed on Vercel.
 
-This solver analyzes game state across up to 6 rounds, filtering word lists based on letter positions and states. Users input their guesses and the resulting feedback (green/yellow/gray), and the program returns all remaining valid solutions.
+## Using it
 
-## Features
+1. Type a five-letter guess — physical keyboard or the on-screen one.
+2. Click each tile to cycle it **gray → yellow → green** to match your game.
+   Positions you have already solved are colored green automatically.
+3. Press **Enter**. The remaining candidates appear on the right.
+4. Click any word — a suggestion or a candidate — to load it into the next row.
 
-- **Multiple word lists**: Choose from Scrabble dictionary, Stanford word list, or cfreshman's Wordle answers (most restrictive, matches actual game solutions)
-- **State-based filtering**: Handles green (correct position), yellow (wrong position), and gray (excluded) letters
-- **Duplicate letter logic**: Correctly processes words where the same letter appears multiple times with different states
-- **Edge case handling**: Improved tuple-based state tracking ensures accurate filtering when letters repeat
+Miscolored a tile? Click it again on a submitted row and the list re-filters. **Undo**
+drops the last guess, **Reset** clears the board.
 
-## What I Learned
+### Settings
 
-- Constraint-based filtering systems
-- Complex game state management
-- Edge case detection and resolution (duplicate letters, position tracking)
-- Efficient data structures (sets, lists, tuples)
+- **Letters per word** — 2 to 12. Anything other than five switches to the Scrabble
+  dictionary, the only list that carries other lengths.
+- **Rounds** — 1 to 10.
+- **Answer list** — the official Wordle solutions (default, tightest), Knuth's Stanford
+  five-letter list, or the full Scrabble dictionary.
 
-## Usage
+## How the solving works
 
-**Requirements**: Python 3.6+
-```bash
-# Navigate to download location
-cd /path/to/download
+The Python version accumulated constraints as the game went on: green positions, letters
+ruled out, letters known to be present, and a special case for doubled letters. Duplicate
+letters were the hard part — a guess of `EERIE` against `REBEL` colors one E green, one
+yellow, and one gray, and the rules for which is which are easy to get subtly wrong.
 
-# Run the solver
-python Wordle_Solver.py
+The port turns the question around. A candidate word survives a guess exactly when
+*scoring that guess against the candidate reproduces the colors the game showed*:
+
+```ts
+matchesGuess(candidate, guess) === (scoreGuess(guess.word, candidate) === guess.marks)
 ```
 
-## Future Plans
+`scoreGuess` is the game's own marking rule — greens claim their letters first, then
+yellows draw from what is left. Every duplicate-letter case falls out of it for free,
+and there is no separate bookkeeping to keep in sync.
 
-- Refactor with constants for easy modification (word length, max rounds)
-- Add GUI with Wordle-style grid interface
-- Click-to-toggle letter states (green/yellow/gray)
-- Display word list statistics and letter frequency analysis
+### Best next guess
 
-## Development Notes
+For each candidate, the solver buckets every possible answer by the pattern that guess
+would produce, and reports the average bucket size — how many words you would still be
+sifting after playing it. Lower is better, and the top five are shown.
 
-### Duplicate Letter Challenge
+That calculation is quadratic, so it runs in a Web Worker (`lib/rank.worker.ts`) with an
+allocation-free inner loop: words packed into one byte array, patterns folded into base-3
+integers. Roughly 5 million pairs a second, and the board never stalls. Above 3,000
+candidates it falls back to positional letter frequency instead.
 
-The trickiest part was handling cases where the same letter appears multiple times with different states (e.g., first 'E' is yellow, second 'E' is green). 
+## Running locally
 
-**Initial approach**: Tracked individual letter variables, but failed when yellow appeared before green in the guess.
+```bash
+npm install
+npm run dev      # http://localhost:3000
+npm test         # solver + word list tests
+npm run build    # production build
+npm run lint
+```
 
-**Solution**: Refactored to store complete guess state as tuples, evaluate all letters first, then check for duplicates. This ensures words like "EERIE" are correctly filtered when the game shows mixed states.
+The original CLI still runs on its own, no dependencies beyond Python 3.10+:
 
-This edge case taught me the importance of state management order and led to the list/tuple-based architecture used throughout.
+```bash
+python cli/main.py
+```
+
+## Deploying
+
+The app is a static Next.js build with no server-side state, no environment variables,
+and no database — the word lists ship in `public/wordlists/` and the solving happens in
+the browser. Import the repo at [vercel.com/new](https://vercel.com/new) and accept the
+detected defaults, or:
+
+```bash
+npx vercel deploy --prod
+```
+
+## Layout
+
+```
+app/                 Next.js app router — page, layout, styles
+components/          Board, Keyboard, Results, Settings
+lib/solver.ts        Scoring, filtering, ranking (no UI, fully tested)
+lib/rank.worker.ts   Ranking off the main thread
+lib/wordlists.ts     List metadata and loading
+public/wordlists/    The three word lists
+cli/                 The original Python command-line solver
+```
+
+## Word lists
+
+| List | Words | Source |
+| --- | --- | --- |
+| Wordle answers | 2,315 | [cfreshman gist](https://gist.github.com/cfreshman/a03ef2cba789d8cf00c08f767e0fad7b) |
+| Stanford five-letter words | 5,757 | [Knuth's SGB word list](https://www-cs-faculty.stanford.edu/~knuth/sgb-words.txt) |
+| Scrabble dictionary | 178,691 | [redbo/scrabble](https://github.com/redbo/scrabble) |
+
+They are vendored rather than fetched at runtime, so the app has no external dependency
+at request time and works offline once loaded.

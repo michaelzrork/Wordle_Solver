@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f7f7f8;
+  --panel: #ffffff;
+  --border: #d7dadd;
+  --text: #16181b;
+  --muted: #6c7278;
+  --tile-empty: #ffffff;
+  --tile-border: #cfd3d7;
+  --tile-active: #8e9296;
+  --key: #e8eaed;
+  --key-text: #16181b;
+  --green: #6aaa64;
+  --yellow: #c9b458;
+  --gray: #787c7e;
+  --accent: #3b7ea1;
+  --shadow: 0 1px 2px rgb(16 18 20 / 0.06), 0 8px 24px rgb(16 18 20 / 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121213;
+    --panel: #1a1a1c;
+    --border: #313134;
+    --text: #f5f5f6;
+    --muted: #94979b;
+    --tile-empty: #121213;
+    --tile-border: #3a3a3c;
+    --tile-active: #565758;
+    --key: #818384;
+    --key-text: #ffffff;
+    --green: #538d4e;
+    --yellow: #b59f3b;
+    --gray: #3a3a3c;
+    --accent: #6aa8c9;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-edge: var(--border);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-tile: var(--tile-empty);
+  --color-tile-border: var(--tile-border);
+  --color-tile-active: var(--tile-active);
+  --color-key: var(--key);
+  --color-key-ink: var(--key-text);
+  --color-green: var(--green);
+  --color-yellow: var(--yellow);
+  --color-gray: var(--gray);
+  --color-accent: var(--accent);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Tiles and keys share one flip/press feel. */
+@keyframes tile-pop {
+  0% { transform: scale(0.9); }
+  60% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+.tile-pop {
+  animation: tile-pop 140ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-pop {
+    animation: none;
+  }
+}
