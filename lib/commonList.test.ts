@@ -52,4 +52,23 @@ describe("the generated default list", () => {
       expect(committed).not.toContain(word);
     }
   });
+
+  it("leaves out proper names and non-words", () => {
+    // No dictionary carries these at all.
+    for (const word of ["james", "susan", "david", "bronx", "heerd", "ahhhh"]) {
+      expect(committed).not.toContain(word);
+    }
+    // Dictionary words that still read as names.
+    for (const word of ["jimmy", "henry", "peter", "kelly", "jerry", "terry"]) {
+      expect(committed).not.toContain(word);
+    }
+  });
+
+  it("keeps names Wordle has actually used as answers", () => {
+    // 112 official answers are also first names. The answer list outranks the
+    // name list every time.
+    for (const word of ["bobby", "sally", "carol", "sandy", "penny", "daisy", "grace"]) {
+      expect(committed).toContain(word);
+    }
+  });
 });

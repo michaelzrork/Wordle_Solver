@@ -4,11 +4,18 @@
  * Neither source list covers the game on its own. The official answer list is
  * the set Wordle shipped with, and the puzzle has since used words outside it
  * (ASPIC). Knuth's Stanford list has those, but it is a word list rather than
- * an answer list: it carries ~1,600 plural and third-person -S forms, and a
- * Wordle answer is never one of those. So: every official answer, plus the
- * Stanford words that could plausibly be an answer.
+ * an answer list — it carries things a Wordle answer is never allowed to be:
+ *
+ *   - ~1,600 plural and third-person -S forms
+ *   - proper names (JAMES, SUSAN) and other words no dictionary carries
+ *   - names that double as words (JIMMY, HENRY, PETER)
+ *
+ * So: every official answer, plus the Stanford words that survive all three.
  *
  * Run with `npm run build:wordlist` after changing a source list.
+ *
+ * Name data merges github.com/dominictarr/random-name and
+ * github.com/smashew/NameDatabases, vendored in data/first-names.txt.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -16,7 +23,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const WORDLISTS = "public/wordlists";
 
 const read = (file) =>
-  readFileSync(`${WORDLISTS}/${file}`, "utf8")
+  readFileSync(file, "utf8")
     .split("\n")
     .map((word) => word.trim().toLowerCase())
     .filter(Boolean);
@@ -44,12 +51,13 @@ export function isPluralForm(word, stems) {
 }
 
 /**
- * Every official answer, plus the Stanford words that are not plural forms.
+ * Every official answer, plus the Stanford words that could be answers.
  *
- * Official answers are never filtered: they are known-good by definition, and
- * a few of them ("brass", "amiss") would trip the heuristic otherwise.
+ * Official answers are never filtered. They are known-good by definition, and
+ * they would not survive these rules: "brass" and "amiss" read as plurals, and
+ * 112 of them are also first names (BOBBY, SALLY, CAROL, DAISY, PENNY).
  */
-export function buildCommonList(answers, stanford, dictionary) {
+export function buildCommonList(answers, stanford, dictionary, names) {
   const stems = new Map();
   for (const word of dictionary) {
     if (word.length > 4) continue;
@@ -58,16 +66,33 @@ export function buildCommonList(answers, stanford, dictionary) {
   }
 
   const official = new Set(answers);
+  const inDictionary = new Set(dictionary);
+  const isName = new Set(names);
+
   const words = new Set(official);
   for (const word of stanford) {
-    if (!official.has(word) && !isPluralForm(word, stems)) words.add(word);
+    if (official.has(word)) continue;
+    // Not in the Scrabble dictionary: a proper noun (JAMES, BRONX) or not a
+    // word at all (HEERD, AHHHH). Wordle answers are always dictionary words.
+    if (!inDictionary.has(word)) continue;
+    // A dictionary word that still reads as a name (JIMMY, HENRY, PETER). This
+    // also drops a few that are only incidentally names — MISTY, EMERY, DAFFY
+    // — none of which Wordle has used in 2,315 puzzles.
+    if (isName.has(word)) continue;
+    if (isPluralForm(word, stems)) continue;
+    words.add(word);
   }
 
   return [...words].sort();
 }
 
 export function buildFromVendoredLists() {
-  return buildCommonList(read("wordle-answers.txt"), read("stanford.txt"), read("scrabble.txt"));
+  return buildCommonList(
+    read(`${WORDLISTS}/wordle-answers.txt`),
+    read(`${WORDLISTS}/stanford.txt`),
+    read(`${WORDLISTS}/scrabble.txt`),
+    read("data/first-names.txt"),
+  );
 }
 
 // Only write the file when run directly, so tests can import the builder.

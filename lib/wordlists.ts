@@ -35,7 +35,7 @@ export const WORD_LISTS: WordListInfo[] = [
     id: "common",
     name: "Likely answers",
     description:
-      "Every official answer plus Knuth's Stanford words, minus the plurals Wordle never uses. The default — the answer list alone has been outgrown by the game.",
+      "Every official answer plus Knuth's Stanford words, minus the plurals and proper names Wordle never uses. The default — the answer list alone has been outgrown by the game.",
     lengths: [5],
     file: "/wordlists/common.txt",
     sources: [STANFORD, CFRESHMAN],

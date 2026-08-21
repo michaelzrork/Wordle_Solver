@@ -96,6 +96,7 @@ lib/solver.ts        Scoring, filtering, ranking (no UI, fully tested)
 lib/rank.worker.ts   Ranking off the main thread
 lib/wordlists.ts     List metadata and loading
 public/wordlists/    The word lists, including the generated default
+data/                Build-time only: name data used to filter the default
 scripts/             Word list generation
 cli/                 The original Python command-line solver
 ```
@@ -104,19 +105,30 @@ cli/                 The original Python command-line solver
 
 | List | Words | Source |
 | --- | --- | --- |
-| Likely answers (default) | 4,133 | built from the two below |
+| Likely answers (default) | 3,876 | built from the two below |
 | Original Wordle answers | 2,315 | [cfreshman gist](https://gist.github.com/cfreshman/a03ef2cba789d8cf00c08f767e0fad7b) |
 | Stanford five-letter words | 5,757 | [Knuth's SGB word list](https://www-cs-faculty.stanford.edu/~knuth/sgb-words.txt) |
 | Scrabble dictionary | 178,691 | [redbo/scrabble](https://github.com/redbo/scrabble) |
 
 Neither source is an answer list on its own. Wordle has used solutions the shipped list
 never held (ASPIC), Knuth's list is missing 33 words that have been answers (ADMIN,
-LATTE, ANIME), and Knuth's is a *word* list — it carries ~1,600 plural and third-person
--S forms, which a Wordle answer is never allowed to be.
+LATTE, ANIME), and Knuth's is a *word* list — it carries plenty a Wordle answer is never
+allowed to be:
 
-So the default is generated: every official answer, plus the Stanford words that are not
-plural forms. Official answers are never filtered — they are known-good, and a few
-("brass", "amiss") would trip the heuristic. Regenerate with:
+- ~1,600 plural and third-person -S forms
+- proper names (JAMES, SUSAN, BRONX) and entries no dictionary carries (HEERD, AHHHH)
+- names that double as words (JIMMY, HENRY, PETER)
+
+So the default is generated: every official answer, plus the Stanford words that are in
+the Scrabble dictionary, are not first names, and are not plural forms. Official answers
+are never filtered — they are known-good, and they would not survive these rules: "brass"
+and "amiss" read as plurals, and 112 of them are also first names (BOBBY, SALLY, CAROL,
+DAISY, PENNY). The name filter also drops a few words that are only incidentally names
+(MISTY, EMERY, DAFFY), none of which Wordle has used in 2,315 puzzles.
+
+Name data is vendored in `data/first-names.txt`, merged from
+[dominictarr/random-name](https://github.com/dominictarr/random-name) and
+[smashew/NameDatabases](https://github.com/smashew/NameDatabases). Regenerate with:
 
 ```bash
 npm run build:wordlist
