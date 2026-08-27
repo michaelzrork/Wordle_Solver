@@ -15,22 +15,18 @@ export const viewport: Viewport = {
   ],
 };
 
-// Pageview counting, off unless NEXT_PUBLIC_GOATCOUNTER_CODE names a GoatCounter
-// site. The script sets no cookies and skips localhost, so dev runs stay uncounted.
-const goatCounterCode = process.env.NEXT_PUBLIC_GOATCOUNTER_CODE;
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className="min-h-dvh antialiased">
         {children}
-        {goatCounterCode ? (
-          <Script
-            src="https://gc.zgo.at/count.js"
-            strategy="afterInteractive"
-            data-goatcounter={`https://${goatCounterCode}.goatcounter.com/count`}
-          />
-        ) : null}
+        {/* Pageview counting. No cookies, and count.js skips localhost, so dev
+            runs stay out of the numbers. */}
+        <Script
+          src="https://gc.zgo.at/count.js"
+          strategy="afterInteractive"
+          data-goatcounter="https://wordlesolver.goatcounter.com/count"
+        />
       </body>
     </html>
   );
