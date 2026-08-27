@@ -78,14 +78,24 @@ python cli/main.py
 
 ## Deploying
 
-The app is a static Next.js build with no server-side state, no environment variables,
-and no database — the word lists ship in `public/wordlists/` and the solving happens in
-the browser. Import the repo at [vercel.com/new](https://vercel.com/new) and accept the
-detected defaults, or:
+The app is a static Next.js build with no server-side state and no database — the word
+lists ship in `public/wordlists/` and the solving happens in the browser. Import the repo
+at [vercel.com/new](https://vercel.com/new) and accept the detected defaults, or:
 
 ```bash
 npx vercel deploy --prod
 ```
+
+### Analytics
+
+Pageviews are counted by [GoatCounter](https://www.goatcounter.com), which is off unless
+`NEXT_PUBLIC_GOATCOUNTER_CODE` is set. Create a site there, then set the variable to the
+site code — the subdomain part alone, so `wordle` for `wordle.goatcounter.com`, not the
+whole URL. It is the only environment variable the app reads, and the only one it needs.
+
+The script sets no cookies and collects no personal data, so it needs no consent banner.
+It ignores `localhost`, so local dev never shows up in the numbers. Leave the variable
+unset and no script is loaded at all.
 
 ## Layout
 
