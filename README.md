@@ -94,9 +94,9 @@ The site code is public by nature — it ships in the page source — so it is c
 than held in an environment variable, and a deploy needs no configuration.
 
 The script sets no cookies and collects no personal data, so it needs no consent banner,
-and it ignores `localhost`, so local dev never shows up in the numbers. Forks that deploy
-will count into the same dashboard; GoatCounter records the hostname, so those visits can
-be told apart after the fact.
+and it ignores `localhost`, so local dev never shows up in the numbers. GoatCounter stores
+the path but not the hostname, so a fork that deploys counts into the same dashboard with
+no way to tell its visits apart — swap the code in `app/layout.tsx` for your own site.
 
 ## Layout
 
