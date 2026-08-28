@@ -7,16 +7,21 @@ import Results from "@/components/Results";
 import Settings, { type GameSettings } from "@/components/Settings";
 import {
   deriveConstraints,
+  filterByPartial,
   filterWords,
   keyboardState,
   patternKey,
   type Guess,
   type Mark,
 } from "@/lib/solver";
+import { useDebounced } from "@/lib/useDebounced";
 import { useSuggestions } from "@/lib/useSuggestions";
 import { DEFAULT_LIST_ID, getWordList, loadWordList } from "@/lib/wordlists";
 
 const MARK_CYCLE: Mark[] = ["gray", "yellow", "green"];
+
+/** How long typing has to settle before the next-guess ranking re-runs. */
+const RANK_SETTLE_MS = 200;
 
 const DEFAULT_SETTINGS: GameSettings = {
   listId: DEFAULT_LIST_ID,
@@ -97,20 +102,41 @@ export default function Home() {
     [settings.length],
   );
 
-  const candidates = useMemo(() => filterWords(words, guesses), [words, guesses]);
+  const submitted = useMemo(() => filterWords(words, guesses), [words, guesses]);
+
+  // The row being typed narrows the list as it goes, so what is on the board is
+  // always what has been filtered and Enter only locks the row in.
+  const candidates = useMemo(() => filterByPartial(submitted, draft), [submitted, draft]);
+
+  // Constraints and key colors stay on submitted rows only. Feeding the draft
+  // into `markFor` would let a tile colored green pre-color the next letter
+  // typed, which then feeds back into the draft it came from.
   const constraints = useMemo(
     () => deriveConstraints(guesses, settings.length),
     [guesses, settings.length],
   );
   const keyStates = useMemo(() => keyboardState(guesses), [guesses]);
 
-  // Suggestions are computed off the main thread, keyed to the guess history
-  // that produced this candidate set.
-  const rankKey = useMemo(
-    () => `${listKey}|${guesses.map((guess) => `${guess.word}${patternKey(guess.marks)}`).join(",")}`,
-    [listKey, guesses],
+  // Ranking is far too slow to redo per keystroke, so it follows the draft only
+  // once typing settles. A length change resets the draft, and the old one is
+  // still settling, so fall back to the live draft until the two agree.
+  const settling = useDebounced(draft, RANK_SETTLE_MS);
+  const settledDraft = settling.letters.length === settings.length ? settling : draft;
+
+  const rankCandidates = useMemo(
+    () => filterByPartial(submitted, settledDraft),
+    [submitted, settledDraft],
   );
-  const { suggestions, ranking } = useSuggestions(candidates, settings.length, rankKey);
+
+  // Suggestions are computed off the main thread, keyed to the board state that
+  // produced this candidate set.
+  const rankKey = useMemo(
+    () =>
+      `${listKey}|${guesses.map((guess) => `${guess.word}${patternKey(guess.marks)}`).join(",")}` +
+      `|${settledDraft.letters.join("")}${patternKey(settledDraft.marks)}`,
+    [listKey, guesses, settledDraft],
+  );
+  const { suggestions, ranking } = useSuggestions(rankCandidates, settings.length, rankKey);
 
   const boardFull = guesses.length >= settings.rounds;
   const draftFilled = draft.letters.every((letter) => letter !== "");
@@ -311,7 +337,7 @@ export default function Home() {
             {boardFull
               ? ` All ${settings.rounds} ${settings.rounds === 1 ? "round" : "rounds"} used — undo or reset to keep going.`
               : draftFilled
-                ? " Press Enter to filter."
+                ? " Press Enter to keep this row and start the next."
                 : ""}
           </p>
 
@@ -331,7 +357,7 @@ export default function Home() {
             ranking={ranking}
             loading={loading}
             error={error}
-            guessCount={guesses.length}
+            hasFeedback={guesses.length > 0 || !draftEmpty}
             listName={list.name}
             totalWords={words.length}
             onPick={fillDraft}

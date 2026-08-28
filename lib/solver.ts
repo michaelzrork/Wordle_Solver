@@ -72,6 +72,66 @@ export function filterWords(words: string[], guesses: Guess[]): string[] {
   return words.filter((word) => guesses.every((guess) => matchesGuess(word, guess)));
 }
 
+/** A row still being typed. Positions with no letter yet hold "". */
+export interface PartialGuess {
+  letters: string[];
+  marks: Mark[];
+}
+
+/**
+ * Color a partly typed guess against an answer.
+ *
+ * Empty positions score as null and take no part in the marking, but the
+ * answer letters underneath them stay in the pool the yellows draw from — so
+ * once every position is filled this agrees with `scoreGuess` exactly, and a
+ * row keeps its colors as the last letters land.
+ */
+export function scorePartialGuess(letters: string[], answer: string): (Mark | null)[] {
+  const length = letters.length;
+  const marks: (Mark | null)[] = new Array(length).fill(null);
+  const remaining = new Map<string, number>();
+
+  for (let i = 0; i < length; i++) {
+    if (letters[i] !== "" && letters[i] === answer[i]) {
+      marks[i] = "green";
+    } else {
+      remaining.set(answer[i], (remaining.get(answer[i]) ?? 0) + 1);
+    }
+  }
+
+  for (let i = 0; i < length; i++) {
+    if (letters[i] === "" || marks[i] === "green") continue;
+    const left = remaining.get(letters[i]) ?? 0;
+    if (left > 0) {
+      marks[i] = "yellow";
+      remaining.set(letters[i], left - 1);
+    } else {
+      marks[i] = "gray";
+    }
+  }
+
+  return marks;
+}
+
+/** True when `candidate` could still be the answer given a partly typed row. */
+export function matchesPartialGuess(candidate: string, draft: PartialGuess): boolean {
+  if (candidate.length !== draft.letters.length) return false;
+  const marks = scorePartialGuess(draft.letters, candidate);
+  for (let i = 0; i < marks.length; i++) {
+    if (marks[i] !== null && marks[i] !== draft.marks[i]) return false;
+  }
+  return true;
+}
+
+/**
+ * Narrow `words` by the row being typed, so the list tracks the board without
+ * waiting for the row to be submitted. An untouched row narrows nothing.
+ */
+export function filterByPartial(words: string[], draft: PartialGuess): string[] {
+  if (draft.letters.every((letter) => letter === "")) return words;
+  return words.filter((word) => matchesPartialGuess(word, draft));
+}
+
 export interface Constraints {
   /** Letter known to sit at each position, or "" when unknown. */
   greens: string[];

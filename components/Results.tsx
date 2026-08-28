@@ -11,7 +11,8 @@ interface ResultsProps {
   ranking: boolean;
   loading: boolean;
   error: string | null;
-  guessCount: number;
+  /** Whether the board carries anything to filter by yet. */
+  hasFeedback: boolean;
   listName: string;
   totalWords: number;
   onPick: (word: string) => void;
@@ -23,7 +24,7 @@ export default function Results({
   ranking,
   loading,
   error,
-  guessCount,
+  hasFeedback,
   listName,
   totalWords,
   onPick,
@@ -55,13 +56,13 @@ export default function Results({
 
       {error && <p className="mt-3 text-sm text-muted">{error}</p>}
 
-      {!loading && !error && guessCount === 0 && (
+      {!loading && !error && !hasFeedback && (
         <p className="mt-2 text-sm text-muted">
-          Type a guess, color the tiles to match your game, then press Enter.
+          Type a guess and color the tiles to match your game — the list narrows as you go.
         </p>
       )}
 
-      {!loading && !error && guessCount > 0 && candidates.length === 0 && (
+      {!loading && !error && hasFeedback && candidates.length === 0 && (
         <p className="mt-2 text-sm text-muted">
           Nothing in this list fits that feedback. Check the tile colors — or try a wider word list.
         </p>
