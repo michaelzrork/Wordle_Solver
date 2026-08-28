@@ -15,6 +15,9 @@ interface ResultsProps {
   hasFeedback: boolean;
   listName: string;
   totalWords: number;
+  /** Name of a wider list to offer when nothing fits, or null when this is the widest. */
+  widerListName: string | null;
+  onWiden: () => void;
   onPick: (word: string) => void;
 }
 
@@ -27,6 +30,8 @@ export default function Results({
   hasFeedback,
   listName,
   totalWords,
+  widerListName,
+  onWiden,
   onPick,
 }: ResultsProps) {
   // Keyed to the candidate list so a new set of results starts collapsed
@@ -63,9 +68,21 @@ export default function Results({
       )}
 
       {!loading && !error && hasFeedback && candidates.length === 0 && (
-        <p className="mt-2 text-sm text-muted">
-          Nothing in this list fits that feedback. Check the tile colors — or try a wider word list.
-        </p>
+        <div className="mt-2 flex flex-col items-start gap-3">
+          <p className="text-sm text-muted">
+            Nothing in {listName} fits that feedback. Check the tile colors
+            {widerListName ? " — or search a wider list." : " — a tile is probably the wrong color."}
+          </p>
+          {widerListName && (
+            <button
+              type="button"
+              onClick={onWiden}
+              className="rounded-md border border-accent px-3 py-1.5 text-sm font-semibold text-accent hover:bg-accent hover:text-bg"
+            >
+              Switch to {widerListName}?
+            </button>
+          )}
+        </div>
       )}
 
       {solved && (

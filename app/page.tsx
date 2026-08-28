@@ -16,7 +16,7 @@ import {
 } from "@/lib/solver";
 import { useDebounced } from "@/lib/useDebounced";
 import { useSuggestions } from "@/lib/useSuggestions";
-import { DEFAULT_LIST_ID, getWordList, loadWordList } from "@/lib/wordlists";
+import { DEFAULT_LIST_ID, getWordList, loadWordList, widestListForLength } from "@/lib/wordlists";
 
 const MARK_CYCLE: Mark[] = ["gray", "yellow", "green"];
 
@@ -137,6 +137,19 @@ export default function Home() {
     [listKey, guesses, settledDraft],
   );
   const { suggestions, ranking } = useSuggestions(rankCandidates, settings.length, rankKey);
+
+  // Nothing fitting the feedback is usually a miscolored tile, but it can also
+  // be a word this list has never carried. The lists nest, so only the widest
+  // one for this length is worth offering — anything else would come up empty
+  // too. Offered as a button rather than switched automatically: a silent
+  // change of list would look like the solver had simply changed its mind.
+  const widest = widestListForLength(settings.length);
+  const widerList = widest && widest.id !== settings.listId ? widest : null;
+
+  const widen = useCallback(() => {
+    if (!widerList) return;
+    applySettings({ ...settings, listId: widerList.id, preferredListId: widerList.id });
+  }, [applySettings, settings, widerList]);
 
   const boardFull = guesses.length >= settings.rounds;
   const draftFilled = draft.letters.every((letter) => letter !== "");
@@ -360,6 +373,8 @@ export default function Home() {
             hasFeedback={guesses.length > 0 || !draftEmpty}
             listName={list.name}
             totalWords={words.length}
+            widerListName={widerList?.name ?? null}
+            onWiden={widen}
             onPick={fillDraft}
           />
         </div>

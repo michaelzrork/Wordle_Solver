@@ -11,6 +11,17 @@ export interface WordListInfo {
   description: string;
   /** Word lengths this list can serve, or "any" for a full dictionary. */
   lengths: number[] | "any";
+  /**
+   * How wide the list is, for offering a wider one when a search comes up
+   * empty. Only the top of this ordering is load-bearing, and it holds in the
+   * data: every five-letter word in the other three lists is a word Wordle
+   * accepts, so widening to the game's own list can never lose a candidate.
+   *
+   * Below that the lists do not strictly nest — the Scrabble dictionary is the
+   * bigger set but it has no ADMIN or INBOX, both of which are real answers the
+   * likely-answers list carries — which is why only the widest is ever offered.
+   */
+  breadth: number;
   file: string;
   sources: WordListSource[];
 }
@@ -30,13 +41,29 @@ const SCRABBLE: WordListSource = {
   url: "https://github.com/redbo/scrabble",
 };
 
+const NYT: WordListSource = {
+  name: "the Wordle game bundle",
+  url: "https://www.nytimes.com/games/wordle",
+};
+
 export const WORD_LISTS: WordListInfo[] = [
+  {
+    id: "nyt",
+    name: "Wordle's full dictionary",
+    description:
+      "Every word the game accepts as a guess, read out of Wordle's own code. The default — the only list that has never missed an answer, and it holds every word the others do.",
+    lengths: [5],
+    breadth: 4,
+    file: "/wordlists/nyt.txt",
+    sources: [NYT],
+  },
   {
     id: "common",
     name: "Likely answers",
     description:
-      "Every official answer plus Knuth's Stanford words, minus the plurals and proper names Wordle never uses. The default — the answer list alone has been outgrown by the game.",
+      "Every official answer plus Knuth's Stanford words, minus the plurals and proper names Wordle never uses. Narrows fastest, but has missed four answers since 2021 — MOMMY, LORIS, EMOJI, TWEEN.",
     lengths: [5],
+    breadth: 2,
     file: "/wordlists/common.txt",
     sources: [STANFORD, CFRESHMAN],
   },
@@ -44,22 +71,25 @@ export const WORD_LISTS: WordListInfo[] = [
     id: "wordle",
     name: "Original Wordle answers",
     description:
-      "The 2,315 solutions Wordle shipped with. The tightest set, but the puzzle has since used words outside it.",
+      "The 2,315 solutions Wordle shipped with. The tightest set, but the game now takes about one answer in eleven from outside it.",
     lengths: [5],
+    breadth: 1,
     file: "/wordlists/wordle-answers.txt",
     sources: [CFRESHMAN],
   },
   {
     id: "scrabble",
     name: "Scrabble dictionary",
-    description: "Every playable Scrabble word, 2 to 15 letters. Needed for word lengths other than five.",
+    description:
+      "Every playable Scrabble word, 2 to 15 letters. The only list that covers word lengths other than five; at five letters Wordle's own list holds all of it and more.",
     lengths: "any",
+    breadth: 3,
     file: "/wordlists/scrabble.txt",
     sources: [SCRABBLE],
   },
 ];
 
-export const DEFAULT_LIST_ID = "common";
+export const DEFAULT_LIST_ID = "nyt";
 
 export function getWordList(id: string): WordListInfo {
   return WORD_LISTS.find((list) => list.id === id) ?? WORD_LISTS[0];
@@ -72,6 +102,20 @@ export function supportsLength(list: WordListInfo, length: number): boolean {
 /** Lists that can answer for a given word length, best-first. */
 export function listsForLength(length: number): WordListInfo[] {
   return WORD_LISTS.filter((list) => supportsLength(list, length));
+}
+
+/**
+ * The widest list that can serve a word length.
+ *
+ * When a search comes up empty this is the only list worth offering. It is a
+ * superset of every other list for that length, so it is the one switch that
+ * can never lose a candidate the current list already had.
+ */
+export function widestListForLength(length: number): WordListInfo | null {
+  return listsForLength(length).reduce<WordListInfo | null>(
+    (widest, list) => (widest === null || list.breadth > widest.breadth ? list : widest),
+    null,
+  );
 }
 
 const cache = new Map<string, Promise<string[]>>();

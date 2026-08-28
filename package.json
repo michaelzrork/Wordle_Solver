@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "build:wordlist": "node scripts/build-common-list.mjs",
+    "build:nytlist": "node scripts/fetch-nyt-list.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

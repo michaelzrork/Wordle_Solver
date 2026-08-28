@@ -24,8 +24,12 @@ drops the last guess, **Reset** clears the board.
 - **Letters per word** — 2 to 12. Anything other than five switches to the Scrabble
   dictionary, the only list that carries other lengths.
 - **Rounds** — 1 to 10.
-- **Answer list** — likely answers (default), the original Wordle answers, or the full
-  Scrabble dictionary.
+- **Answer list** — Wordle's full dictionary (default), likely answers, the original
+  Wordle answers, or the Scrabble dictionary.
+
+If a search comes up empty, the results panel offers a one-click switch to the widest
+list that covers your word length. It is offered rather than applied: a list that changed
+itself would look like the solver had quietly changed its mind.
 
 ## How the solving works
 
@@ -116,10 +120,31 @@ cli/                 The original Python command-line solver
 
 | List | Words | Source |
 | --- | --- | --- |
-| Likely answers (default) | 3,876 | built from the two below |
+| Wordle's full dictionary (default) | 14,855 | the [game's own code](https://www.nytimes.com/games/wordle) |
+| Likely answers | 3,876 | built from the two below |
 | Original Wordle answers | 2,315 | [cfreshman gist](https://gist.github.com/cfreshman/a03ef2cba789d8cf00c08f767e0fad7b) |
 | Stanford five-letter words | 5,757 | [Knuth's SGB word list](https://www-cs-faculty.stanford.edu/~knuth/sgb-words.txt) |
 | Scrabble dictionary | 178,691 | [redbo/scrabble](https://github.com/redbo/scrabble) |
+
+### Why the game's own dictionary is the default
+
+Every other list has been caught out. Checked against all 1,897 puzzles published
+between June 2021 and August 2026, the original answer list misses 51 of them and the
+gap is widening — 22 of the 240 puzzles in 2026 alone. The generated "likely answers"
+list misses four (MOMMY, LORIS, EMOJI, TWEEN), three of them since mid-2025. Even the
+Scrabble dictionary misses three, because ADMIN, INBOX and EMOJI are not playable
+Scrabble words. Wordle's own dictionary misses none, by construction: an answer has to
+be a word the game accepts.
+
+It is not free. The wider list leaves about four times as many candidates after the
+opening guess and costs roughly half a guess per game, which is why the tighter lists
+stay available — with the widen button as the way back out of a dead end.
+
+Scrabble is *not* the fallback at five letters, despite being the bigger file. All 8,938
+of its five-letter words are words Wordle accepts, and Wordle accepts 5,917 more, so
+switching to it could only ever lose candidates.
+
+### The generated "likely answers" list
 
 Neither source is an answer list on its own. Wordle has used solutions the shipped list
 never held (ASPIC), Knuth's list is missing 33 words that have been answers (ADMIN,
@@ -147,6 +172,20 @@ npm run build:wordlist
 
 `scripts/build-common-list.mjs` holds the rule, and the test suite re-runs it and
 compares against the committed file, so the two cannot drift.
+
+### Refreshing Wordle's dictionary
+
+The game's word list is not published anywhere; it ships inside the JavaScript the page
+loads, as one long array of five-letter strings. `scripts/fetch-nyt-list.mjs` reads the
+bundle URLs off the page — their hashes change on every release, so they cannot be
+pinned — and takes the array out of whichever bundle carries it:
+
+```bash
+npm run build:nytlist
+```
+
+Worth re-running every few months. The game adds words, and a word it has just added is
+exactly the kind that turns up as an answer.
 
 They are vendored rather than fetched at runtime, so the app has no external dependency
 at request time and works offline once loaded.
