@@ -404,6 +404,10 @@ export default function Home() {
           </a>
           .
         </p>
+        <p className="mt-2">
+          An independent fan-made tool. Not affiliated with, endorsed by or sponsored by The New
+          York Times Company. Wordle is a trademark of The New York Times Company.
+        </p>
       </footer>
     </main>
   );
